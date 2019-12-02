@@ -1,3 +1,4 @@
+#pragma once
 #include <fstream>
 #include <vector>
 #include <string>
@@ -9,24 +10,31 @@
 class Midi {
 	private:
 		std::string filename;
-		
 		//header
 		uint16_t format {0};
 		uint16_t tracks {0};
 		uint16_t division {0};	//this is supposed to be signed
-
 		//mtrk
 		std::vector<Mtrk> mtrk;
-
 		//random functions
 		void switch_endianness(uint16_t& f) {
 			f = ((f << 8) | (f >> 8));
 		}
-		void switch_endianness(int16_t& f) {
-			f = ((f << 8) | (f >> 8));
-		}
 	public:
-		void open(std::string fname) {
+		Midi() : filename("midi_file") {}
+		Midi(Midi& m) : filename(m.filename), format(m.format), division(m.division), mtrk(m.mtrk) {}
+		void operator=(Midi&);
+		void open(std::string);
+};
+
+void Midi::operator=(Midi& m) {
+	filename = m.filename;
+	format = m.format;
+	division = m.division;
+	mtrk = m.mtrk;
+}
+
+void Midi::open(std::string fname) {
 			// read midi file fname into memory, populate objects
 
 			std::ifstream f;
@@ -59,12 +67,8 @@ class Midi {
 			file += 14;
 
 			for(int i = 0; i < tracks; i++) {
+				std::cout << "pushing back an mtrk" << std::endl;
 				mtrk.push_back(Mtrk(file));
 			}
-			std::cout << *file << std::endl;
-
 			delete[] file_m;
 		}
-
-};
-
