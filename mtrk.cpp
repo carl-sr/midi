@@ -1,4 +1,5 @@
 #include "./mtrk.hpp"
+
 #include <cstdint>
 #include <cstring>
 #include <iostream>
@@ -150,6 +151,44 @@ void Midi_Event::print_info() {
 	printf("-------------------------\n");
 }
 
+void Midi_Event::set_function(u_int8_t f) {
+	if(f != 0xf7) {
+		function = f;
+	}
+}
+
+void Midi_Event::set_first_byte(u_int8_t b) {
+	fb = b;
+}
+
+void Midi_Event::set_second_byte(u_int8_t b) {
+	sb = b;
+}
+
+void Midi_Event::set_channel(int ch) {
+	if(ch >= 0x0 && ch <= 0xf) {
+		function = function & 0xf0;
+		function = function | ch;
+	}
+}
+
+void Midi_Event::adjust_pitch(int p) {
+	if(function < 0x80 || function > 0xaf) {
+		return;
+	}
+	if(p + fb >=0 && p + fb <= 127) {
+		fb += p;
+	}
+}
+
+void Midi_Event::adjust_velocity(int v) {
+	if(function < 0x80 || function > 0xaf) {
+		return;
+	}
+	if(v + sb >=0 && v + sb <= 127) {
+		sb += v;
+	}
+}
 
 // Meta_Event ===================================================================================
 
@@ -190,7 +229,7 @@ void Meta_Event::print_info() {
 Sys_Ex_Event::Sys_Ex_Event(u_int8_t*& f, int v) {
 	delta_time = v;
 	int data_length = vlen_to_int(f);
-	
+
 	while(data_length--) {
 		data.push_back(*f++);
 	}
