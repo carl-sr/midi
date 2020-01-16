@@ -4,77 +4,90 @@
 #include <string>
 #include <memory>
 
-class Mtrk;
-class Mtrk_Event;
+#include <endian.h>
+
+class MTrk;
+class MTrk_Event;
 class Midi_Event;
 class Meta_Event;
 class Sys_Ex_Event;
 
-unsigned int vlen_to_int(uint8_t*&);
+unsigned int vlen_to_int(u_int8_t*&);
 
+#pragma pack(2)
 
-class Mtrk {
+class MThd {
 	private:
-		//check data types
-		int chunk_type;
-		int length;
-		std::vector<std::shared_ptr<Mtrk_Event>> events;
-		// std::vector<int> events;
+		u_int32_t chunk_type;
+		u_int32_t length;
+		u_int16_t format;
+		u_int16_t ntrks;
+		u_int16_t division;
 	public:
-		// Mtrk();
-		Mtrk(uint8_t*& f);
+		MThd();
+		MThd(u_int8_t *&f);
+		void print_info();
+};
+
+class MTrk {
+	private:
+		u_int32_t chunk_type;
+		u_int32_t length;
+
+		std::vector<std::shared_ptr<MTrk_Event>> track_events;
+	public:
+		MTrk(u_int8_t*& f);
 		void print_info();
 	
 };
 
-class Mtrk_Event {
-	private:
-
+class MTrk_Event {
+	protected:
+		int delta_time {0};
 	public:
-		virtual ~Mtrk_Event() {};
+		virtual ~MTrk_Event() {};
 		virtual std::string event_type()=0;
+		virtual void print_info()=0;
 };
 
 
-class Midi_Event : public Mtrk_Event {
+class Midi_Event : public MTrk_Event {
 	private:
-		int channel;
-		int event_function;
-		uint8_t fb {0};
-		uint8_t sb {0};
-
-		int gap;
-
+		u_int8_t function;
+		u_int8_t fb;
+		u_int8_t sb;
 	public:
-		Midi_Event(uint8_t*& f);
+		Midi_Event(u_int8_t*& f, int);
 		~Midi_Event() {};
-		std::string event_type();
+		std::string event_type() {return "Midi Event";};
+		void print_info();
 
 };
 
-class Meta_Event : public Mtrk_Event {
+class Meta_Event : public MTrk_Event {
 	private:
-		uint8_t type;
-		unsigned int length;
-		std::vector<uint8_t> data;
+		u_int8_t type;
+		std::vector<u_int8_t> data;
 	public:
-		Meta_Event(uint8_t*& f);
+		Meta_Event(u_int8_t*& f, int);
 		~Meta_Event() {};
-		std::string event_type();
+		std::string event_type() {return "Meta Event";};
+		void print_info();
 };
 
 
-class Sys_Ex_Event : public Mtrk_Event {
+class Sys_Ex_Event : public MTrk_Event {
 	private:
-		unsigned int length;
-		std::vector<uint8_t> data;
-
+		std::vector<u_int8_t> data;
 	public:
-		Sys_Ex_Event(uint8_t*& f);
+		Sys_Ex_Event(u_int8_t*& f, int);
 		~Sys_Ex_Event() {};
-		std::string event_type();
+		std::string event_type() {return "Sys Ex Event";};
+		void print_info();
 };
 
 
 
 
+
+#pragma pack()

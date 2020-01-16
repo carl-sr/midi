@@ -8,95 +8,69 @@
 #include "./mtrk.hpp"
 
 class Midi {
-private:
-	std::string filename;
-	//header
-	uint16_t format{0};
-	uint16_t tracks{0};
-	uint16_t division{0}; //this is supposed to be signed
-	//mtrk
-	std::vector<Mtrk> mtrk;
-	//random functions
-	void switch_endianness(uint16_t &f)
-	{
-		f = ((f << 8) | (f >> 8));
-	}
+	private:
+		MThd header_chunk;
+		std::vector<std::shared_ptr<MTrk>> track_chunks;
 
-public:
-	Midi() : filename("midi_file") {}
-	Midi(Midi &m) : filename(m.filename), format(m.format), division(m.division), mtrk(m.mtrk) {}
-	void operator=(Midi &);
-	void open(std::string);
-	void info();
+
+	public:
+		void operator=(Midi &);
+		void open(std::string);
+		void info();
 };
 
+
 void Midi::operator=(Midi &m) {
-	filename = m.filename;
-	format = m.format;
-	division = m.division;
-	mtrk = m.mtrk;
+
 }
 
-void Midi::open(std::string fname) {
-	// read midi file fname into memory, populate objects
+void Midi::open(std::string f_name) {
+	// read midi file f_name into memory, populate objects
 
 	std::ifstream f;
-	f.open(fname, std::ios::binary | std::ios::ate);
+	f.open(f_name, std::ios::binary | std::ios::ate);
 	if (!f.is_open())
 	{
-		std::cerr << "Error: Unable to open file " << fname << std::endl;
+		std::cerr << "Error: Unable to open file " << f_name << std::endl;
 		return;
 	}
 
+	// get size of file
 	int f_size = f.tellg();
 	f.seekg(std::fstream::beg);
 
-	//save the beginning of the bytes with const
-	const uint8_t *file_m = new uint8_t[f_size];
-	uint8_t *file = const_cast<uint8_t *>(file_m);
-
-	for (int i = 0; i < f_size; i++)
-	{
-		file[i] = f.get();
+	// read into file_b and close file
+	u_int8_t *file_b = new u_int8_t[f_size];
+	for (int i = 0; i < f_size; i++) {
+		file_b[i] = f.get();
 	}
 	f.close();
 
-	format = reinterpret_cast<uint16_t *>(file)[4];
-	tracks = reinterpret_cast<uint16_t *>(file)[5];
-	division = reinterpret_cast<uint16_t *>(file)[6];
-	switch_endianness(format);
-	switch_endianness(tracks);
-	switch_endianness(division);
+	u_int8_t* file_b_pop = file_b;	// save the old data pointer for deleting array
+	header_chunk = MThd(file_b_pop);
 
-	//skip past the header information
-	file += 14;
-
-	for (int i = 0; i < tracks; i++)
-	{
-		mtrk.push_back(Mtrk(file));
+	while(file_b_pop - file_b < f_size) {
+		track_chunks.push_back(std::make_shared<MTrk>(MTrk(file_b_pop)));
 	}
-	delete[] file_m;
+
+
+	// delete file byte array after objects are populated
+	delete[] file_b;
 }
 
 void Midi::info() {
-	std::cout << "********** STARTING INFO **********" << std::endl;
-	std::cout << "Filename: " << filename << std::endl;
-	std::cout << "Format: " << format << std::endl;
-	std::cout << "Track Count: " << tracks << std::endl;
-	std::cout << "Division: " << division << std::endl;
-	int c {0};
-	for(auto i = mtrk.begin(); i != mtrk.end(); i++) {
-		std::cout << "-MTrk " << ++c << std::endl;
-		i->print_info();
+	printf("Midi file info:\n");
+	printf("\nMThd:\n");
+	printf("=================================\n");
+	header_chunk.print_info();
+	
+	if(track_chunks.size()) {
+		printf("\nMTrk chunks:\n");
+		printf("=================================\n");
+		for(auto i = track_chunks.begin(); i != track_chunks.end(); i++) {
+			i->get()->print_info();
+		}
 	}
-	std::cout << "*********** ENDING INFO ***********" << std::endl;
+
 }
 
-// private:
-// 	std::string filename;
-// 	//header
-// 	uint16_t format{0};
-// 	uint16_t tracks{0};
-// 	uint16_t division{0}; //this is supposed to be signed
-// 	//mtrk
-// 	std::vector<Mtrk> mtrk;

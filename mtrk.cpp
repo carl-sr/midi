@@ -1,10 +1,11 @@
 #include "./mtrk.hpp"
 #include <cstdint>
+#include <cstring>
 #include <iostream>
 #include <string>
 #include <memory>
 
-unsigned int vlen_to_int(uint8_t*& v) {
+unsigned int vlen_to_int(u_int8_t*& v) {
 	// convert a variable length string of bytes into an integer.
 	// last byte in variable length byte string has a msb 1
 	// all other bytes have msb 0
@@ -27,173 +28,180 @@ unsigned int vlen_to_int(uint8_t*& v) {
 }
 
 
+// MThd===================================================================================
 
-// Mtrk===================================================================================
-Mtrk::Mtrk(uint8_t *&f) {
-	// printf("Entering MTrk constructor value of f: %x\n", *f);
+MThd::MThd() {
+	chunk_type = 0x4d546864;
+	length = 0x00000006;
+	format = 0001;
+	ntrks = 0001;
+	division = 0001;	//change this
 
-	std::cout << "STARTING AN MTRK SEGMENT: " << f[0] << f[1] << f[2] << f[3] << std::endl;
-	// construct MTrk based on raw byte data
-	uint8_t* base = f;
-	if (f[0] != 'M' || f[1] != 'T' || f[2] != 'r' || f[3] != 'k') {
-		std::cerr << "\t\tnot an mtrk" << std::endl;
-		return;
-	}
-	f += 4; //jump past 'MTrk'
+}
 
-	length = (int)(f[0] << 24 | f[1] << 16 | f[2] << 8 | f[3]);
-	f += 4; //jump past length
-	base = f;
+MThd::MThd(u_int8_t *&f) {
+	std::memcpy(this, f, 14);
 
-	std::cout << "Length: " << length << std::endl;
+	// convert endianness
+	chunk_type = be32toh(chunk_type);
+	length = be32toh(length);
+	format = be16toh(format);
+	ntrks = be16toh(ntrks);
+	division = be16toh(division);
 
-	// for(int i = 0; i < length; i++) {
-	// 	(f[i] > 0x0f) ? printf("%x ", f[i]) : printf("0%x ", f[i]);
-	// 	if((i+1)%10 == 0) {
-	// 		printf("\n");
-	// 	}
-	// }
-	std::cout << std::endl;
+	f += 14;
+}
 
-	while (f < (base + length)) {
-		// int type = (int)(f[0] << 8 | f[1]);
-		// printf("Starting f value: %p(%d)\n", f, *f);
-		// printf("++++++++%x,%x,%x,%x\n", f[0], f[1], f[2], f[3]);
-		// std::cin.get();
-		// printf("\tCreating MTrk at value of f: %x\n", *f);
-		printf("%x ", *f);
+void MThd::print_info() {
+	printf("-------------------------\n");
+	printf("| chunk_type | %8x |\n", chunk_type);
+	printf("-------------------------\n");
+	printf("| length     | %8x |\n", length);
+	printf("-------------------------\n");
+	printf("| format     | %8x |\n", format);
+	printf("-------------------------\n");
+	printf("| ntrks      | %8x |\n", ntrks);
+	printf("-------------------------\n");
+	printf("| division   | %8x |\n", division);
+	printf("-------------------------\n");
+}
 
-		int type = static_cast<int>(*f);
-		if(type == 0x00) {
-			f++;
-			continue;
+// MTrk===================================================================================
+
+MTrk::MTrk(u_int8_t *&f) {
+	std::memcpy(this, f, 8);
+
+	// convert endianness
+	chunk_type = be32toh(chunk_type);
+	length = be32toh(length);
+
+	f += 8;
+	u_int8_t* base = f;
+	while(f - base < length) {
+		// find the variable delta time first
+		int v = vlen_to_int(f);
+
+		if(*f == 0xff) {
+			// meta event
+			f += 1;
+			// printf("pushing meta event...\n");
+			track_events.push_back(std::make_shared<Meta_Event>(Meta_Event(f, v)));
 		}
-		if (type >= 0x80 && type <= 0xef) {
-			// Midi events (status bytes 0x8n - 0xEn)
-			events.push_back(std::make_shared<Midi_Event>(Midi_Event(f)));
-		}
-		else if (type == 0xf0 || type == 0xf7) {
-			// SysEx events (status bytes 0xF0 and 0xF7)
-			events.push_back(std::make_shared<Sys_Ex_Event>(Sys_Ex_Event(f)));
-		}
-		else if (type == 0xff) {
-			// Meta events (status byte 0xFF)
-			events.push_back(std::make_shared<Meta_Event>(Meta_Event(f)));
+		else if (*f == 0xf0) {
+			// sys ex event
+			f += 1;
+			// printf("pushing sys ex event...\n");
+			track_events.push_back(std::make_shared<Sys_Ex_Event>(Sys_Ex_Event(f, v)));
 		}
 		else {
-			printf("--------Unkown byte: %x\n", *f);
-			f++;
+			// midi event
+			// printf("pushing midi event...\n");
+			track_events.push_back(std::make_shared<Midi_Event>(Midi_Event(f, v)));
 		}
-		// printf("\tEnding creation of MTrk at value of f: %x\n", *f);
-
-	}
-	// printf("Ending MTrk constructor value of f: %x\n", *f);
-}
-
-void Mtrk::print_info() {
-	std::cout << "\tChunk Type: " << chunk_type << std::endl;
-	std::cout << "\tLength: " << length << std::endl;
-	for(auto i = events.begin(); i != events.end(); i++) {
-		std::cout << (*i)->event_type() << std::endl;
 	}
 }
 
-
+void MTrk::print_info() {
+	for(auto i = track_events.begin(); i != track_events.end(); i++) {
+		i->get()->print_info();
+		printf("\n");
+	}
+}
 
 // Midi_Event ===================================================================================
 
-Midi_Event::Midi_Event(uint8_t*& f) {
-	channel =  *f & 0b00001111;
-	event_function =*f >> 4;
-	f += 1;
-	fb = *f;
-	f += 1;
-	sb += *f;
-	gap = vlen_to_int(f);
-	f += 1;
-	
+Midi_Event::Midi_Event(u_int8_t*& f, int v) {
+	delta_time = v;
+	std::memcpy(this, f, 3);
 
+	if(function >= 0xc0 && function <= 0xdf) {
+		// two bytes
+		f += 2;
+	}
+	else if(function == 0xf3) {
+		// two bytes
+		f += 2;
+	}
+	else if(function >= 0xf4 && function <= 0xff) {
+		// one byte
+		f += 1;
+	}
+	else if(function == 0xf1) {
+		// one byte
+		f += 1;
+	}
+	else {
+		f += 3;
+	}
 
+	// print_info();
 }
 
-
-std::string Midi_Event::event_type() {
-	std::string s = "Midi Event: Gap: ";
-	s += std::to_string(gap);
-	s += " channel: ";
-	s += std::to_string(channel);
-	s += " function: ";
-	s += std::to_string(event_function);
-	s += " fb: ";
-	s += std::to_string(fb);
-	s += " sb: ";
-	s += std::to_string(sb);
-	return s;
+void Midi_Event::print_info() {
+	printf("Midi Event:\n");
+	printf("-------------------------\n");
+	printf("| d_time     | %8x |\n", delta_time);
+	printf("-------------------------\n");
+	printf("| function   | %8x |\n", function);
+	printf("-------------------------\n");
+	printf("| 1st byte   | %8x |\n", fb);
+	printf("-------------------------\n");
+	printf("| 2nd byte   | %8x |\n", sb);
+	printf("-------------------------\n");
 }
 
 
 // Meta_Event ===================================================================================
 
-Meta_Event::Meta_Event(uint8_t*& f) {
-	f += 1;
+Meta_Event::Meta_Event(u_int8_t*& f, int v) {
+	delta_time = v;
 	type = *f;
 	f += 1;
-	length = vlen_to_int(f);
-	for(int i = 0; i < length; i++) {
+	int data_length = vlen_to_int(f);
+	while(data_length--) {
 		data.push_back(*f++);
-	}
-	if(length > 0) {
-		f += 1;
 	}
 }
 
-
-std::string Meta_Event::event_type() {
-	std::string s = "Meta Event";
-	s += " type: ";
-	s += std::to_string(type);
-	s += " length: ",
-	s += std::to_string(length);
-	s += " Data: ";
-	for(auto i = data.begin(); i != data.end(); i++) {
-		s += *i;
+void Meta_Event::print_info() {
+	printf("Meta Event:\n");
+	printf("-------------------------\n");
+	printf("| d_time     | %8x |\n", delta_time);
+	printf("-------------------------\n");
+	printf("| type       | %8x |\n", type);
+	if(data.size()) {
+		printf("-------------------------\n");
+		printf("| data:                 |\n");
+		for(auto i = data.begin(); i != data.end(); i++) {
+			if(*i >= 32 && *i <= 126) {
+				printf("|    %8x (%c)       |\n", *i, *i);
+			}
+			else {
+				printf("|    %8x           |\n", *i);
+			}
+		}
 	}
-	return s;
+	printf("-------------------------\n");
+
 }
 
 // Sys_Ex_Event ===================================================================================
 
-Sys_Ex_Event::Sys_Ex_Event(uint8_t*& f) {
-	length = vlen_to_int(++f);
-	for(int i = 0; i < length; i++) {
+Sys_Ex_Event::Sys_Ex_Event(u_int8_t*& f, int v) {
+	delta_time = v;
+	int data_length = vlen_to_int(f);
+	
+	while(data_length--) {
 		data.push_back(*f++);
 	}
+
 }
 
-std::string Sys_Ex_Event::event_type() {
-	std::string s = "Sys Ex Event Length: ";
-	s += length;
-	s += " Data: ";
-	for(auto i = data.begin(); i != data.end(); i++) {
-		s += *i;
-	}
-	return s;
+void Sys_Ex_Event::print_info() {
+	printf("Sys Ex Event:\n");
+	printf("-------------------------\n");
+	printf("| d_time     | %8x |\n", delta_time);
+	printf("-------------------------\n");
+
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

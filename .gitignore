@@ -30,3 +30,9 @@
 *.exe
 *.out
 *.app
+
+# Midi
+*.mid
+
+# PDF
+*.pdf
