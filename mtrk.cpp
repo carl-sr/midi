@@ -113,7 +113,9 @@ void MTrk::print_info() {
 
 Midi_Event::Midi_Event(u_int8_t*& f, int v) {
 	delta_time = v;
-	std::memcpy(this, f, 3);
+	function = f[0];
+	fb = f[1];
+	sb = f[2];
 
 	if(function >= 0xc0 && function <= 0xdf) {
 		// two bytes
@@ -134,8 +136,6 @@ Midi_Event::Midi_Event(u_int8_t*& f, int v) {
 	else {
 		f += 3;
 	}
-
-	// print_info();
 }
 
 void Midi_Event::print_info() {

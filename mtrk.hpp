@@ -109,4 +109,5 @@ class Sys_Ex_Event : public MTrk_Event {
 		std::string event_type() {return "Sys Ex Event";};
 		void print_info();
 };
+
 #pragma pack()
