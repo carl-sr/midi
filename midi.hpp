@@ -4,6 +4,7 @@
 #include <string>
 #include <iostream>
 #include <cstring>
+#include <time.h>
 
 #include "./mtrk.hpp"
 
@@ -11,11 +12,13 @@ class Midi {
 	private:
 		MThd header_chunk;
 		std::vector<std::shared_ptr<MTrk>> track_chunks;
-
+		std::string title;
 
 	public:
 		void operator=(Midi &);
 		void open(std::string);
+		void write();
+		void write(std::string);
 		void info();
 };
 
@@ -25,6 +28,8 @@ void Midi::operator=(Midi &m) {
 }
 
 void Midi::open(std::string f_name) {
+	//start the random seed
+	srand(time(NULL));
 	// read midi file f_name into memory, populate objects
 
 	std::ifstream f;
@@ -56,6 +61,24 @@ void Midi::open(std::string f_name) {
 
 	// delete file byte array after objects are populated
 	delete[] file_b;
+}
+
+void Midi::write() {
+	write("midi_" + std::to_string(rand()%10000));
+}
+
+void Midi::write(std::string s) {
+	std::cout << s << std::endl;
+	std::fstream f;
+
+	// f.open(s + ".mid", std::ios::binary | std::ios::trunc | std::ios::out);
+	f.open("output.mid", std::ios::binary | std::ios::trunc | std::ios::out);
+
+	header_chunk.write(f);
+
+	for(auto i = track_chunks.begin(); i != track_chunks.end(); i++) {
+		i->get()->write(f);
+	}
 }
 
 void Midi::info() {

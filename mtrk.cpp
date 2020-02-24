@@ -5,6 +5,37 @@
 #include <iostream>
 #include <string>
 #include <memory>
+#include <fstream>
+
+Bit_pattern::Bit_pattern(long d=0) {
+	data = d;
+}
+
+bool Bit_pattern::operator[](int p) {
+		long offset {0b1};
+		offset = offset << p;
+		return data & offset;
+}
+
+bool Bit_pattern::get() {
+	bool res = operator[](pos);
+	pos++;
+	return res;
+}
+
+int Bit_pattern::bit_length() {
+	for(int i = sizeof(data)*8-1; i >= 0; i--) {
+		if(operator[](i)) {
+			return i+1;
+		}
+	}
+	return 0;
+}
+
+int Bit_pattern::position() {
+	return pos;
+}
+
 
 unsigned int vlen_to_int(u_int8_t*& v) {
 	// convert a variable length string of bytes into an integer.
@@ -26,6 +57,38 @@ unsigned int vlen_to_int(u_int8_t*& v) {
 	v += set + 1;
 
 	return add;
+}
+
+void int_to_vlen(long v, std::fstream& f) {
+	if(v == 0) {
+		f << (u_int8_t)0;
+		return;
+	}
+
+	Bit_pattern bits(v);
+	std::vector<u_int8_t> data;
+
+
+	while(bits.position() < bits.bit_length()) {
+		u_int8_t x {0};
+		for(int i = 0; i < 7; i++) {
+			if(bits.get()) {
+				x = x | (0b1 << i);
+			}
+		}
+		data.push_back(x);
+	}
+
+	while(!data.empty()) {
+		u_int8_t d = data.back();
+		data.pop_back();
+
+		if(!data.empty()) {
+			d = d | 0b10000000; 
+		}
+		f << d;
+	}
+	
 }
 
 
@@ -65,6 +128,24 @@ void MThd::print_info() {
 	printf("-------------------------\n");
 	printf("| division   | %8x |\n", division);
 	printf("-------------------------\n");
+}
+
+void MThd::write(std::fstream& f) {
+	u_int32_t end_chunk_type = be32toh(chunk_type);
+	f.write(reinterpret_cast<const char*>(&end_chunk_type), 4);
+
+	u_int32_t end_length = be32toh(length);
+	f.write(reinterpret_cast<const char*>(&end_length), 4);
+
+	u_int16_t end_format = be16toh(format);
+	f.write(reinterpret_cast<const char*>(&end_format), 2);
+
+	u_int16_t end_ntrks = be16toh(ntrks);
+	f.write(reinterpret_cast<const char*>(&end_ntrks), 2);
+
+	u_int16_t end_division = be16toh(division);
+	f.write(reinterpret_cast<const char*>(&end_division), 2);
+
 }
 
 // MTrk===================================================================================
@@ -109,6 +190,21 @@ void MTrk::print_info() {
 	}
 }
 
+
+void MTrk::write(std::fstream& f) {
+	u_int32_t end_chunk_type = be32toh(chunk_type);
+	f.write(reinterpret_cast<const char*>(&end_chunk_type), 4);
+
+	// this needs to be calculated at some point
+	u_int32_t end_length = be32toh(length);
+	f.write(reinterpret_cast<const char*>(&end_length), 4);
+
+	for(auto i = track_events.begin(); i != track_events.end(); i++) {
+		i->get()->write(f);
+	}
+
+}
+
 // Midi_Event ===================================================================================
 
 Midi_Event::Midi_Event(u_int8_t*& f, int v) {
@@ -139,7 +235,7 @@ Midi_Event::Midi_Event(u_int8_t*& f, int v) {
 }
 
 void Midi_Event::print_info() {
-	printf("Midi Event:\n");
+	std::cout << event_type() << std::endl;
 	printf("-------------------------\n");
 	printf("| d_time     | %8x |\n", delta_time);
 	printf("-------------------------\n");
@@ -149,6 +245,27 @@ void Midi_Event::print_info() {
 	printf("-------------------------\n");
 	printf("| 2nd byte   | %8x |\n", sb);
 	printf("-------------------------\n");
+}
+
+void Midi_Event::write(std::fstream& f) {
+	int_to_vlen(delta_time, f);
+	f << function;
+	if(function == 0xf1) {
+		return;
+	}
+	if(function >= 0xf4 && function <= 0xff) {
+		return;
+	}
+	if(function >= 0xc0 && function <= 0xdf) {
+		f << fb;
+	}
+	else if(function == 0xf3) {
+		f << fb;
+	}
+	else {
+		f << fb;
+		f << sb;
+	}
 }
 
 void Midi_Event::set_function(u_int8_t f) {
@@ -203,7 +320,7 @@ Meta_Event::Meta_Event(u_int8_t*& f, int v) {
 }
 
 void Meta_Event::print_info() {
-	printf("Meta Event:\n");
+	std::cout << event_type() << std::endl;
 	printf("-------------------------\n");
 	printf("| d_time     | %8x |\n", delta_time);
 	printf("-------------------------\n");
@@ -224,6 +341,16 @@ void Meta_Event::print_info() {
 
 }
 
+void Meta_Event::write(std::fstream& f) {
+	int_to_vlen(delta_time, f);
+	f << static_cast<u_int8_t>(0xff);
+	f << type;
+	int_to_vlen(data.size(), f);
+	for(auto i = data.begin(); i != data.end(); i++) {
+		f << *i;
+	}
+}
+
 // Sys_Ex_Event ===================================================================================
 
 Sys_Ex_Event::Sys_Ex_Event(u_int8_t*& f, int v) {
@@ -237,10 +364,16 @@ Sys_Ex_Event::Sys_Ex_Event(u_int8_t*& f, int v) {
 }
 
 void Sys_Ex_Event::print_info() {
-	printf("Sys Ex Event:\n");
+	std::cout << event_type() << std::endl;
 	printf("-------------------------\n");
 	printf("| d_time     | %8x |\n", delta_time);
 	printf("-------------------------\n");
 
 }
 
+void Sys_Ex_Event::write(std::fstream& f) {
+	int_to_vlen(data.size(), f);
+	for(auto i = data.begin(); i != data.end(); i++) {
+		f << *i;
+	}
+}

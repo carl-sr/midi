@@ -12,7 +12,20 @@ class Midi_Event;
 class Meta_Event;
 class Sys_Ex_Event;
 
+class Bit_pattern {
+	private:
+		long data;
+		int pos {0};
+	public:
+		Bit_pattern(long);
+		bool operator[](int);
+		bool get();
+		int bit_length();
+		int position();
+};
+
 unsigned int vlen_to_int(u_int8_t*&);
+void int_to_vlen(long, std::fstream&);
 
 #pragma pack(2)
 
@@ -26,6 +39,8 @@ class MThd {
 	public:
 		MThd();
 		MThd(u_int8_t *&f);
+		void write(std::fstream&);
+
 		void print_info();
 };
 
@@ -37,6 +52,8 @@ class MTrk {
 		std::vector<std::shared_ptr<MTrk_Event>> track_events;
 	public:
 		MTrk(u_int8_t*& f);
+		void write(std::fstream&);
+
 		void print_info();
 };
 
@@ -47,6 +64,7 @@ class MTrk_Event {
 		virtual ~MTrk_Event() {};
 		virtual std::string event_type()=0;
 		virtual void print_info()=0;
+		virtual void write(std::fstream&)=0;
 };
 
 
@@ -59,6 +77,8 @@ class Midi_Event : public MTrk_Event {
 		Midi_Event(u_int8_t a=0x90, u_int8_t b=0x80, u_int8_t c=0x80): function(a), fb(b), sb(c) {};
 		Midi_Event(u_int8_t*& f, int);
 		~Midi_Event() {};
+		void write(std::fstream&);
+
 		std::string event_type() {return "Midi Event";};
 		void print_info();
 
@@ -95,6 +115,8 @@ class Meta_Event : public MTrk_Event {
 		Meta_Event(u_int8_t a=0x01): type(a) {};
 		Meta_Event(u_int8_t*& f, int);
 		~Meta_Event() {};
+		void write(std::fstream&);
+
 		std::string event_type() {return "Meta Event";};
 		void print_info();
 };
@@ -106,6 +128,8 @@ class Sys_Ex_Event : public MTrk_Event {
 	public:
 		Sys_Ex_Event(u_int8_t*& f, int);
 		~Sys_Ex_Event() {};
+		void write(std::fstream&);
+
 		std::string event_type() {return "Sys Ex Event";};
 		void print_info();
 };
