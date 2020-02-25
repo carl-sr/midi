@@ -12,7 +12,7 @@ int main(int argc, char* argv[]) {
 	m.open(argv[1]);
 
 	// m.info();
-	m.tree();
+	m.tree(1);
 	m.write();
 	return 0;
 }

@@ -21,4 +21,5 @@ class Midi {
 		void write(std::string);
 		void info();
 		void tree();
+		void tree(int);
 };

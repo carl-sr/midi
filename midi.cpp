@@ -117,3 +117,20 @@ void Midi::tree() {
 	}
 }
 
+void Midi::tree(int index) {
+	if(index > track_chunks.size()-1) {
+		std::cerr << "Invalid track chunk index" << std::endl;
+	}
+	if(index < 10) {
+		std::cout << "00" << index;
+	}
+	else if(index < 100) {
+		std::cout << "0" << index;
+	}
+	else {
+		std::cout << index;
+	}
+	std::cout << " (Track Chunk)" << std::endl;
+	track_chunks[index].get()->tree(true, false);
+}
+
