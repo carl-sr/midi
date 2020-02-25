@@ -104,7 +104,7 @@ void Midi::tree() {
 		}
 		std::cout << " (Track Chunk)" << std::endl;
 
-		i->get()->tree(i+1 == track_chunks.end());
+		i->get()->tree(i+1 == track_chunks.end(), true);
 		++chunk_count;
 	}
 }

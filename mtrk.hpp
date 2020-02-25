@@ -60,7 +60,7 @@ class MTrk {
 		void write(std::fstream&);
 
 		void print_info();
-		void tree(bool);
+		void tree(bool, bool);
 };
 
 class MTrk_Event {

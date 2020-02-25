@@ -200,16 +200,20 @@ void MTrk::print_info() {
 	}
 }
 
-void MTrk::tree(bool last) {
+void MTrk::tree(bool last, bool nested) {
 	int chunk_count {0};
 	for(auto i = track_events.begin(); i != track_events.end(); i++) {
-		if(last) {
-			(i+1 == track_events.end()) ? std::cout << "    └── " : std::cout << "    ├── ";
+		if(nested) {
+			if(last) {
+				(i+1 == track_events.end()) ? std::cout << "    └── " : std::cout << "    ├── ";
+			}
+			else {
+				(i+1 == track_events.end()) ? std::cout << "│   └── " : std::cout << "│   ├── ";
+			}
 		}
 		else {
-			(i+1 == track_events.end()) ? std::cout << "│   └── " : std::cout << "│   ├── ";
+			(i+1 == track_events.end()) ? std::cout << "└── " : std::cout << "├── ";
 		}
-
 		if(chunk_count < 10) {
 			std::cout << "000" << chunk_count;
 		}
@@ -376,7 +380,6 @@ void Meta_Event::print_info() {
 void Meta_Event::tree() {
 	std::cout << "(" << event_type() << ") ";
 	printf("delta time: ");
-
 	print_hex(delta_time);
 	printf(", ");
 
@@ -430,11 +433,44 @@ void Sys_Ex_Event::print_info() {
 	printf("-------------------------\n");
 	printf("| d_time     | %8x |\n", delta_time);
 	printf("-------------------------\n");
+	if(data.size()) {
+		printf("-------------------------\n");
+		printf("| data:                 |\n");
+		for(auto i = data.begin(); i != data.end(); i++) {
+			if(*i >= 32 && *i <= 126) {
+				printf("|    %8x (%c)       |\n", *i, *i);
+			}
+			else {
+				printf("|    %8x           |\n", *i);
+			}
+		}
+	}
+	printf("-------------------------\n");
 }
 
 void Sys_Ex_Event::tree() {
 	std::cout << "(" << event_type() << ") ";
+	printf("delta time: ");
 	print_hex(delta_time);
+	printf(", ");
+
+	printf("data: ");
+	if(!data.empty()) {
+		printf("0x");
+		for(auto i = data.begin(); i != data.end(); i++) {
+			(*i > 0xf) ? printf("%x", *i) : printf("0%x", *i);
+		}
+		printf(" %%c:(");
+		for(auto i = data.begin(); i != data.end(); i++) {
+			if(*i >= 32 && *i <= 126) {
+				printf("%c", *i);
+			}
+		}
+		printf(")");
+	}
+	else {
+		printf("(empty)");
+	}
 }
 
 void Sys_Ex_Event::write(std::fstream& f) {
