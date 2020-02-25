@@ -6,11 +6,15 @@
 
 #include <endian.h>
 
+#include "./note_help.hpp"
+
 class MTrk;
 class MTrk_Event;
 class Midi_Event;
 class Meta_Event;
 class Sys_Ex_Event;
+
+void print_hex(u_int8_t);
 
 class Bit_pattern {
 	private:
@@ -42,6 +46,7 @@ class MThd {
 		void write(std::fstream&);
 
 		void print_info();
+		void tree();
 };
 
 class MTrk {
@@ -55,6 +60,7 @@ class MTrk {
 		void write(std::fstream&);
 
 		void print_info();
+		void tree(bool);
 };
 
 class MTrk_Event {
@@ -64,6 +70,7 @@ class MTrk_Event {
 		virtual ~MTrk_Event() {};
 		virtual std::string event_type()=0;
 		virtual void print_info()=0;
+		virtual void tree()=0;
 		virtual void write(std::fstream&)=0;
 };
 
@@ -81,6 +88,7 @@ class Midi_Event : public MTrk_Event {
 
 		std::string event_type() {return "Midi Event";};
 		void print_info();
+		void tree();
 
 		u_int8_t func() {return function;};
 		u_int8_t f_byte() {return fb;};
@@ -95,15 +103,6 @@ class Midi_Event : public MTrk_Event {
 		void set_first_byte(u_int8_t);
 		void set_second_byte(u_int8_t);
 
-		// 0x80 - 0xef
-		void set_channel(int);
-
-		// note event specific
-		void set_pitch(u_int8_t u) {set_first_byte(u);};
-		void adjust_pitch(int);
-
-		void set_velocity(u_int8_t u) {set_second_byte(u);};
-		void adjust_velocity(int);
 
 };
 
@@ -119,6 +118,7 @@ class Meta_Event : public MTrk_Event {
 
 		std::string event_type() {return "Meta Event";};
 		void print_info();
+		void tree();
 };
 
 
@@ -132,6 +132,7 @@ class Sys_Ex_Event : public MTrk_Event {
 
 		std::string event_type() {return "Sys Ex Event";};
 		void print_info();
+		void tree();
 };
 
 #pragma pack()

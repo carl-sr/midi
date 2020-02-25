@@ -1,4 +1,5 @@
 #include "./mtrk.hpp"
+#include "./note_help.hpp"
 
 #include <cstdint>
 #include <cstring>
@@ -6,6 +7,11 @@
 #include <string>
 #include <memory>
 #include <fstream>
+
+void print_hex(u_int8_t a) {
+	(a > 0xf) ? printf("0x%x", a) : printf("0x0%x", a);
+}
+
 
 Bit_pattern::Bit_pattern(long d=0) {
 	data = d;
@@ -130,6 +136,13 @@ void MThd::print_info() {
 	printf("-------------------------\n");
 }
 
+void MThd::tree() {
+	std::cout << "Length: " << length << std::endl;
+	std::cout << "Format: " << format << std::endl;
+	std::cout << "Track Count: " << ntrks << std::endl;
+	std::cout << "Division: " << division << std::endl;
+}
+
 void MThd::write(std::fstream& f) {
 	u_int32_t end_chunk_type = be32toh(chunk_type);
 	f.write(reinterpret_cast<const char*>(&end_chunk_type), 4);
@@ -166,18 +179,15 @@ MTrk::MTrk(u_int8_t *&f) {
 		if(*f == 0xff) {
 			// meta event
 			f += 1;
-			// printf("pushing meta event...\n");
 			track_events.push_back(std::make_shared<Meta_Event>(Meta_Event(f, v)));
 		}
 		else if (*f == 0xf0) {
 			// sys ex event
 			f += 1;
-			// printf("pushing sys ex event...\n");
 			track_events.push_back(std::make_shared<Sys_Ex_Event>(Sys_Ex_Event(f, v)));
 		}
 		else {
 			// midi event
-			// printf("pushing midi event...\n");
 			track_events.push_back(std::make_shared<Midi_Event>(Midi_Event(f, v)));
 		}
 	}
@@ -190,6 +200,34 @@ void MTrk::print_info() {
 	}
 }
 
+void MTrk::tree(bool last) {
+	int chunk_count {0};
+	for(auto i = track_events.begin(); i != track_events.end(); i++) {
+		if(last) {
+			(i+1 == track_events.end()) ? std::cout << "    └── " : std::cout << "    ├── ";
+		}
+		else {
+			(i+1 == track_events.end()) ? std::cout << "│   └── " : std::cout << "│   ├── ";
+		}
+
+		if(chunk_count < 10) {
+			std::cout << "000" << chunk_count;
+		}
+		else if(chunk_count < 100) {
+			std::cout << "00" << chunk_count;
+		}
+		else if(chunk_count < 1000) {
+			std::cout << "0" << chunk_count;
+		}
+		else {
+			std::cout << chunk_count;
+		}
+		std::cout << " ";
+		i->get()->tree();
+		std::cout << std::endl;
+		++chunk_count;
+	}
+}
 
 void MTrk::write(std::fstream& f) {
 	u_int32_t end_chunk_type = be32toh(chunk_type);
@@ -247,6 +285,25 @@ void Midi_Event::print_info() {
 	printf("-------------------------\n");
 }
 
+void Midi_Event::tree() {
+	std::cout << "(" << event_type() << ") ";
+	printf("delta time: ");
+	print_hex(delta_time);
+	printf(", ");
+
+	printf("[");
+	print_hex(function);
+	printf(", ");
+	print_hex(fb);
+	printf(", ");
+	print_hex(sb);
+	printf("] ");
+
+	std::cout << Note_Help::midi_event_function(function) << " ";
+	std::cout << Note_Help::midi_event_fb(function, fb) << " ";
+	std::cout << Note_Help::midi_event_sb(function, sb) << " ";
+}
+
 void Midi_Event::write(std::fstream& f) {
 	int_to_vlen(delta_time, f);
 	f << function;
@@ -280,31 +337,6 @@ void Midi_Event::set_first_byte(u_int8_t b) {
 
 void Midi_Event::set_second_byte(u_int8_t b) {
 	sb = b;
-}
-
-void Midi_Event::set_channel(int ch) {
-	if(ch >= 0x0 && ch <= 0xf) {
-		function = function & 0xf0;
-		function = function | ch;
-	}
-}
-
-void Midi_Event::adjust_pitch(int p) {
-	if(function < 0x80 || function > 0xaf) {
-		return;
-	}
-	if(p + fb >=0 && p + fb <= 127) {
-		fb += p;
-	}
-}
-
-void Midi_Event::adjust_velocity(int v) {
-	if(function < 0x80 || function > 0xaf) {
-		return;
-	}
-	if(v + sb >=0 && v + sb <= 127) {
-		sb += v;
-	}
 }
 
 // Meta_Event ===================================================================================
@@ -341,6 +373,36 @@ void Meta_Event::print_info() {
 
 }
 
+void Meta_Event::tree() {
+	std::cout << "(" << event_type() << ") ";
+	printf("delta time: ");
+
+	print_hex(delta_time);
+	printf(", ");
+
+	printf("type: ");
+	print_hex(type);
+	printf(", ");
+
+	printf("data: ");
+	if(!data.empty()) {
+		printf("0x");
+		for(auto i = data.begin(); i != data.end(); i++) {
+			(*i > 0xf) ? printf("%x", *i) : printf("0%x", *i);
+		}
+		printf(" %%c:(");
+		for(auto i = data.begin(); i != data.end(); i++) {
+			if(*i >= 32 && *i <= 126) {
+				printf("%c", *i);
+			}
+		}
+		printf(")");
+	}
+	else {
+		printf("(empty)");
+	}
+}
+
 void Meta_Event::write(std::fstream& f) {
 	int_to_vlen(delta_time, f);
 	f << static_cast<u_int8_t>(0xff);
@@ -368,7 +430,11 @@ void Sys_Ex_Event::print_info() {
 	printf("-------------------------\n");
 	printf("| d_time     | %8x |\n", delta_time);
 	printf("-------------------------\n");
+}
 
+void Sys_Ex_Event::tree() {
+	std::cout << "(" << event_type() << ") ";
+	print_hex(delta_time);
 }
 
 void Sys_Ex_Event::write(std::fstream& f) {

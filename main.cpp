@@ -9,14 +9,11 @@
 
 
 int main(int argc, char* argv[]) {
-	// std::fstream f("file.hex", std::fstream::out | std::fstream::trunc);
-	// int_to_vlen(0, f);
-	// return 0;
-
 	Midi m;
 	m.open(argv[1]);
 
-	m.info();
+	// m.info();
+	m.tree();
 	m.write();
 	return 0;
 }
