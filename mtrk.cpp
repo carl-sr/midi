@@ -1,12 +1,6 @@
 #include "./mtrk.hpp"
 #include "./note_help.hpp"
 
-#include <cstdint>
-#include <cstring>
-#include <iostream>
-#include <string>
-#include <memory>
-#include <fstream>
 
 void print_hex(u_int8_t a) {
 	(a > 0xf) ? printf("0x%x", a) : printf("0x0%x", a);
@@ -416,6 +410,22 @@ void Meta_Event::write(std::fstream& f) {
 	}
 }
 
+void Meta_Event::set_type(u_int8_t t) {
+	type = t;
+}
+
+void Meta_Event::set_data(std::vector<u_int8_t>& v) {
+	clear_data();
+	add_data(v);
+}
+
+void Meta_Event::add_data(std::vector<u_int8_t>& v) {
+	for(auto i = v.begin(); i != v.end(); i++) {
+		data.push_back(*i);
+	}
+}
+
+
 // Sys_Ex_Event ===================================================================================
 
 Sys_Ex_Event::Sys_Ex_Event(u_int8_t*& f, int v) {
@@ -474,8 +484,21 @@ void Sys_Ex_Event::tree() {
 }
 
 void Sys_Ex_Event::write(std::fstream& f) {
+	int_to_vlen(delta_time, f);
+	f << static_cast<u_int8_t>(0xf0);
 	int_to_vlen(data.size(), f);
 	for(auto i = data.begin(); i != data.end(); i++) {
 		f << *i;
+	}
+}
+
+void Sys_Ex_Event::set_data(std::vector<u_int8_t>& v) {
+	clear_data();
+	add_data(v);
+}
+
+void Sys_Ex_Event::add_data(std::vector<u_int8_t>& v) {
+	for(auto i = v.begin(); i != v.end(); i++) {
+		data.push_back(*i);
 	}
 }

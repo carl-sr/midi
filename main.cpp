@@ -1,5 +1,4 @@
 #include <iostream>
-#include <ncurses.h>
 #include <assert.h>
 
 #include "./midi.hpp"

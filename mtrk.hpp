@@ -3,6 +3,9 @@
 #include <vector>
 #include <string>
 #include <memory>
+#include <iostream>
+#include <cstring>
+#include <fstream>
 
 #include <endian.h>
 
@@ -114,11 +117,21 @@ class Meta_Event : public MTrk_Event {
 		Meta_Event(u_int8_t a=0x01): type(a) {};
 		Meta_Event(u_int8_t*& f, int);
 		~Meta_Event() {};
+
 		void write(std::fstream&);
 
+		// get
 		std::string event_type() {return "Meta Event";};
 		void print_info();
 		void tree();
+
+		// set
+		void set_type(u_int8_t);
+		void set_data(std::vector<u_int8_t>&);
+		void add_data(std::vector<u_int8_t>&);
+		void clear_data() {data.clear();};
+		
+
 };
 
 
@@ -128,11 +141,18 @@ class Sys_Ex_Event : public MTrk_Event {
 	public:
 		Sys_Ex_Event(u_int8_t*& f, int);
 		~Sys_Ex_Event() {};
+
 		void write(std::fstream&);
 
+		// get
 		std::string event_type() {return "Sys Ex Event";};
 		void print_info();
 		void tree();
+
+		// set
+		void set_data(std::vector<u_int8_t>&);
+		void add_data(std::vector<u_int8_t>&);
+		void clear_data() {data.clear();};
 };
 
 #pragma pack()

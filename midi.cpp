@@ -32,22 +32,30 @@ void Midi::open(std::string f_name) {
 	f.seekg(std::fstream::beg);
 
 	// read into file_b and close file
-	u_int8_t *file_b = new u_int8_t[f_size];
+	file_bytes = new u_int8_t[f_size];
 	for (int i = 0; i < f_size; i++) {
-		file_b[i] = f.get();
+		file_bytes[i] = f.get();
 	}
 	f.close();
 
-	u_int8_t* file_b_pop = file_b;	// save the old data pointer for deleting array
+	u_int8_t* file_b_pop = file_bytes;	// save the old data pointer for deleting array
 	header_chunk = MThd(file_b_pop);
 
-	while(file_b_pop - file_b < f_size) {
+	while(file_b_pop - file_bytes < f_size) {
 		track_chunks.push_back(std::make_shared<MTrk>(MTrk(file_b_pop)));
 	}
 
 
 	// delete file byte array after objects are populated
-	delete[] file_b;
+	delete[] file_bytes;
+	file_bytes = NULL;
+}
+
+void Midi::midi_panic() {
+	if(file_bytes) {
+		delete[] file_bytes;
+	}
+	std::cerr << "An error has occured" << std::endl;
 }
 
 void Midi::write() {
@@ -57,7 +65,7 @@ void Midi::write() {
 void Midi::write(std::string s) {
 	std::fstream f;
 
-	return;
+	// return;
 
 	f.open("output.mid", std::ios::binary | std::ios::trunc | std::ios::out);
 	// f.open(s, std::ios::binary | std::ios::trunc | std::ios::out);
