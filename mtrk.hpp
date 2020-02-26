@@ -98,8 +98,6 @@ class Midi_Event : public MTrk_Event {
 		u_int8_t f_byte() {return fb;};
 		u_int8_t s_byte() {return sb;};
 
-		u_int8_t pitch() {return fb;};
-		u_int8_t velocity() {return sb;};
 		u_int8_t channel() {return function >> 4;};
 
 		// general

@@ -352,7 +352,7 @@ void Midi_Event::write(std::fstream& f) {
 }
 
 void Midi_Event::set_function(u_int8_t f) {
-	if(f != 0xf7) {
+	if(f >= 0x80 && f <= 0xff) {
 		function = f;
 	}
 }
