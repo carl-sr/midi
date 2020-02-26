@@ -1,62 +1,45 @@
-#include <fstream>
-#include <vector>
-#include <string>
-#include <iostream>
-#include <cstring>
-#include <time.h>
 
-#include "./mtrk.hpp"
 #include "./midi.hpp"
-#include "./note_help.hpp"
 
 void Midi::operator=(Midi &m) {
 
 }
 
+void Midi::split_path_name(std::string& full_path, std::string& name, std::string& path) {
+	for(int i = full_path.length(); i >=0; i--) {
+		if(full_path[i] == '/') {
+			name = full_path.substr(i+1, full_path.length());
+			path = full_path.substr(0, i+1);
+			return;
+		}
+	}
+	name = full_path;
+	path = "./";
+}
+
+
 void Midi::open(std::string f_name) {
-	title = f_name;
+	split_path_name(f_name, file_name, file_path);
 	//start the random seed
 	srand(time(NULL));
-	// read midi file f_name into memory, populate objects
 
-	std::ifstream f;
-	f.open(f_name, std::ios::binary | std::ios::ate);
-	if (!f.is_open()) {
-		std::cerr << "Error: Unable to open file " << f_name << std::endl;
-		return;
+
+	try {
+		File_bytes file(f_name);
+		header_chunk = MThd(file);
+		while(!file.is_end()) {
+			track_chunks.push_back(std::make_shared<MTrk>(MTrk(file)));
+		}
 	}
-
-
-	// get size of file
-	int f_size = f.tellg();
-	f.seekg(std::fstream::beg);
-
-	// read into file_b and close file
-	file_bytes = new u_int8_t[f_size];
-	for (int i = 0; i < f_size; i++) {
-		file_bytes[i] = f.get();
+	catch(std::exception& e) {
+		std::cerr << "An error occured while reading the midi file: " << e.what() << std::endl;
+		track_chunks.clear();
+		header_chunk = MThd();
+		file_path = "/";
+		file_name = "midi_file.mid";
 	}
-	f.close();
-
-	u_int8_t* file_b_pop = file_bytes;	// save the old data pointer for deleting array
-	header_chunk = MThd(file_b_pop);
-
-	while(file_b_pop - file_bytes < f_size) {
-		track_chunks.push_back(std::make_shared<MTrk>(MTrk(file_b_pop)));
-	}
-
-
-	// delete file byte array after objects are populated
-	delete[] file_bytes;
-	file_bytes = NULL;
 }
 
-void Midi::midi_panic() {
-	if(file_bytes) {
-		delete[] file_bytes;
-	}
-	std::cerr << "An error has occured" << std::endl;
-}
 
 void Midi::write() {
 	write("midi_" + std::to_string(rand()%10000));
@@ -94,26 +77,33 @@ void Midi::info() {
 }
 
 void Midi::tree() {
-	std::cout << title << std::endl;
-	header_chunk.tree();
+	std::cout << "File name: " << file_name << std::endl;
+	std::cout << "File path: " << file_path << std::endl;
+	header_chunk.print_info();
 
-	int chunk_count {0};
-	for(auto i = track_chunks.begin(); i != track_chunks.end(); i++) {
-		(i+1 == track_chunks.end()) ? std::cout << "└── " : std::cout << "├── ";
+	if(track_chunks.empty()) {
+		std::cout << "└── (No track chunks)" << std::endl;
+	}
+	else {
 
-		if(chunk_count < 10) {
-			std::cout << "00" << chunk_count;
-		}
-		else if(chunk_count < 100) {
-			std::cout << "0" << chunk_count;
-		}
-		else {
-			std::cout << chunk_count;
-		}
-		std::cout << " (Track Chunk)" << std::endl;
+		int chunk_count {0};
+		for(auto i = track_chunks.begin(); i != track_chunks.end(); i++) {
+			(i+1 == track_chunks.end()) ? std::cout << "└── " : std::cout << "├── ";
 
-		i->get()->tree(i+1 == track_chunks.end(), true);
-		++chunk_count;
+			if(chunk_count < 10) {
+				std::cout << "00" << chunk_count;
+			}
+			else if(chunk_count < 100) {
+				std::cout << "0" << chunk_count;
+			}
+			else {
+				std::cout << chunk_count;
+			}
+			std::cout << " (Track Chunk)" << std::endl;
+
+			i->get()->tree(i+1 == track_chunks.end(), true);
+			++chunk_count;
+		}
 	}
 }
 

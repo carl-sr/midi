@@ -6,10 +6,11 @@
 #include <iostream>
 #include <cstring>
 #include <fstream>
-
+#include <exception>
 #include <endian.h>
 
 #include "./note_help.hpp"
+#include "./file_bytes.hpp"
 
 class MTrk;
 class MTrk_Event;
@@ -31,7 +32,7 @@ class Bit_pattern {
 		int position();
 };
 
-unsigned int vlen_to_int(u_int8_t*&);
+unsigned int vlen_to_int(File_bytes&);
 void int_to_vlen(long, std::fstream&);
 
 #pragma pack(2)
@@ -45,7 +46,7 @@ class MThd {
 		u_int16_t division;
 	public:
 		MThd();
-		MThd(u_int8_t *&f);
+		MThd(File_bytes&);
 		void write(std::fstream&);
 
 		void print_info();
@@ -59,7 +60,7 @@ class MTrk {
 
 		std::vector<std::shared_ptr<MTrk_Event>> track_events;
 	public:
-		MTrk(u_int8_t*& f);
+		MTrk(File_bytes& f);
 		void write(std::fstream&);
 
 		void print_info();
@@ -85,7 +86,7 @@ class Midi_Event : public MTrk_Event {
 		u_int8_t sb;
 	public:
 		Midi_Event(u_int8_t a=0x90, u_int8_t b=0x80, u_int8_t c=0x80): function(a), fb(b), sb(c) {};
-		Midi_Event(u_int8_t*& f, int);
+		Midi_Event(File_bytes&, int);
 		~Midi_Event() {};
 		void write(std::fstream&);
 
@@ -115,7 +116,7 @@ class Meta_Event : public MTrk_Event {
 		std::vector<u_int8_t> data;
 	public:
 		Meta_Event(u_int8_t a=0x01): type(a) {};
-		Meta_Event(u_int8_t*& f, int);
+		Meta_Event(File_bytes&, int);
 		~Meta_Event() {};
 
 		void write(std::fstream&);
@@ -139,7 +140,7 @@ class Sys_Ex_Event : public MTrk_Event {
 	private:
 		std::vector<u_int8_t> data;
 	public:
-		Sys_Ex_Event(u_int8_t*& f, int);
+		Sys_Ex_Event(File_bytes&, int);
 		~Sys_Ex_Event() {};
 
 		void write(std::fstream&);

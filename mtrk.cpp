@@ -1,5 +1,4 @@
 #include "./mtrk.hpp"
-#include "./note_help.hpp"
 
 
 void print_hex(u_int8_t a) {
@@ -37,7 +36,7 @@ int Bit_pattern::position() {
 }
 
 
-unsigned int vlen_to_int(u_int8_t*& v) {
+unsigned int vlen_to_int(File_bytes& v) {
 	// convert a variable length string of bytes into an integer.
 	// last byte in variable length byte string has a msb 1
 	// all other bytes have msb 0
@@ -103,8 +102,11 @@ MThd::MThd() {
 
 }
 
-MThd::MThd(u_int8_t *&f) {
-	std::memcpy(this, f, 14);
+MThd::MThd(File_bytes& f) {
+	u_int8_t* s = reinterpret_cast<u_int8_t*>(this);
+	for(int i = 0; i < 14; i++) {
+		s[i] = f[i];
+	}
 
 	// convert endianness
 	chunk_type = be32toh(chunk_type);
@@ -112,6 +114,10 @@ MThd::MThd(u_int8_t *&f) {
 	format = be16toh(format);
 	ntrks = be16toh(ntrks);
 	division = be16toh(division);
+
+	if(chunk_type != 0x4d546864) {
+		throw std::runtime_error("Unrecognized file type");
+	}
 
 	f += 14;
 }
@@ -157,16 +163,18 @@ void MThd::write(std::fstream& f) {
 
 // MTrk===================================================================================
 
-MTrk::MTrk(u_int8_t *&f) {
-	std::memcpy(this, f, 8);
+MTrk::MTrk(File_bytes& f) {
+	u_int8_t* s = reinterpret_cast<u_int8_t*>(this);
+	for(int i = 0; i < 8; i++) {
+		s[i] = f[i];
+	}
 
 	// convert endianness
 	chunk_type = be32toh(chunk_type);
 	length = be32toh(length);
 
 	f += 8;
-	u_int8_t* base = f;
-	while(f - base < length) {
+	while(!f.is_end()) {
 		// find the variable delta time first
 		int v = vlen_to_int(f);
 
@@ -196,34 +204,39 @@ void MTrk::print_info() {
 
 void MTrk::tree(bool last, bool nested) {
 	int chunk_count {0};
-	for(auto i = track_events.begin(); i != track_events.end(); i++) {
-		if(nested) {
-			if(last) {
-				(i+1 == track_events.end()) ? std::cout << "    └── " : std::cout << "    ├── ";
+	if(track_events.empty()) {
+		std::cout << "└── (No track events)" << std::endl;
+	}
+	else {
+		for(auto i = track_events.begin(); i != track_events.end(); i++) {
+			if(nested) {
+				if(last) {
+					(i+1 == track_events.end()) ? std::cout << "    └── " : std::cout << "    ├── ";
+				}
+				else {
+					(i+1 == track_events.end()) ? std::cout << "│   └── " : std::cout << "│   ├── ";
+				}
 			}
 			else {
-				(i+1 == track_events.end()) ? std::cout << "│   └── " : std::cout << "│   ├── ";
+				(i+1 == track_events.end()) ? std::cout << "└── " : std::cout << "├── ";
 			}
+			if(chunk_count < 10) {
+				std::cout << "000" << chunk_count;
+			}
+			else if(chunk_count < 100) {
+				std::cout << "00" << chunk_count;
+			}
+			else if(chunk_count < 1000) {
+				std::cout << "0" << chunk_count;
+			}
+			else {
+				std::cout << chunk_count;
+			}
+			std::cout << " ";
+			i->get()->tree();
+			std::cout << std::endl;
+			++chunk_count;
 		}
-		else {
-			(i+1 == track_events.end()) ? std::cout << "└── " : std::cout << "├── ";
-		}
-		if(chunk_count < 10) {
-			std::cout << "000" << chunk_count;
-		}
-		else if(chunk_count < 100) {
-			std::cout << "00" << chunk_count;
-		}
-		else if(chunk_count < 1000) {
-			std::cout << "0" << chunk_count;
-		}
-		else {
-			std::cout << chunk_count;
-		}
-		std::cout << " ";
-		i->get()->tree();
-		std::cout << std::endl;
-		++chunk_count;
 	}
 }
 
@@ -243,7 +256,7 @@ void MTrk::write(std::fstream& f) {
 
 // Midi_Event ===================================================================================
 
-Midi_Event::Midi_Event(u_int8_t*& f, int v) {
+Midi_Event::Midi_Event(File_bytes& f, int v) {
 	delta_time = v;
 	function = f[0];
 	fb = f[1];
@@ -339,13 +352,14 @@ void Midi_Event::set_second_byte(u_int8_t b) {
 
 // Meta_Event ===================================================================================
 
-Meta_Event::Meta_Event(u_int8_t*& f, int v) {
+Meta_Event::Meta_Event(File_bytes& f, int v) {
 	delta_time = v;
 	type = *f;
 	f += 1;
 	int data_length = vlen_to_int(f);
 	while(data_length--) {
-		data.push_back(*f++);
+		data.push_back(*f);
+		f++;
 	}
 }
 
@@ -428,12 +442,13 @@ void Meta_Event::add_data(std::vector<u_int8_t>& v) {
 
 // Sys_Ex_Event ===================================================================================
 
-Sys_Ex_Event::Sys_Ex_Event(u_int8_t*& f, int v) {
+Sys_Ex_Event::Sys_Ex_Event(File_bytes& f, int v) {
 	delta_time = v;
 	int data_length = vlen_to_int(f);
 
 	while(data_length--) {
-		data.push_back(*f++);
+		data.push_back(*f);
+		f++;
 	}
 
 }
