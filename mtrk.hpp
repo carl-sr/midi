@@ -86,7 +86,7 @@ class Midi_Event : public MTrk_Event {
 		u_int8_t sb;
 	public:
 		Midi_Event(u_int8_t a=0x90, u_int8_t b=0x80, u_int8_t c=0x80): function(a), fb(b), sb(c) {};
-		Midi_Event(File_bytes&, int);
+		Midi_Event(File_bytes&, int, u_int8_t);
 		~Midi_Event() {};
 		void write(std::fstream&);
 

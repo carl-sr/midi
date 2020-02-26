@@ -22,6 +22,7 @@ class File_bytes {
 		File_bytes& operator+=(int);
 		File_bytes& operator-=(int);
 		File_bytes& operator++(int);
+		File_bytes& operator--(int);
 		u_int8_t operator*();
 
 		u_int8_t* cur_pos() {

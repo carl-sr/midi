@@ -174,6 +174,8 @@ MTrk::MTrk(File_bytes& f) {
 	length = be32toh(length);
 
 	f += 8;
+
+	u_int8_t running_status {0x90};
 	while(!f.is_end()) {
 		// find the variable delta time first
 		int v = vlen_to_int(f);
@@ -189,8 +191,11 @@ MTrk::MTrk(File_bytes& f) {
 			track_events.push_back(std::make_shared<Sys_Ex_Event>(Sys_Ex_Event(f, v)));
 		}
 		else {
-			// midi event
-			track_events.push_back(std::make_shared<Midi_Event>(Midi_Event(f, v)));
+			// midi event - detect running status events
+			if(f[0] >= 0x80 && f[0] <= 0xff) {
+				running_status = f[0];
+			}
+			track_events.push_back(std::make_shared<Midi_Event>(Midi_Event(f, v, running_status)));
 		}
 	}
 }
@@ -256,11 +261,21 @@ void MTrk::write(std::fstream& f) {
 
 // Midi_Event ===================================================================================
 
-Midi_Event::Midi_Event(File_bytes& f, int v) {
+Midi_Event::Midi_Event(File_bytes& f, int v, u_int8_t running_status) {
 	delta_time = v;
-	function = f[0];
-	fb = f[1];
-	sb = f[2];
+	if(f[0] >= 0x80 && f[0] <= 0xff) {
+		// this is a valid midi event
+		function = f[0];
+		fb = f[1];
+		sb = f[2];
+	}
+	else {
+		// this should use running status
+		function = running_status;
+		fb = f[0];
+		sb = f[1];
+		f--;
+	}
 
 	if(function >= 0xc0 && function <= 0xdf) {
 		// two bytes

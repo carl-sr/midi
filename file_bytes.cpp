@@ -51,6 +51,11 @@ File_bytes& File_bytes::operator++(int) {
 	return *this;
 }
 
+File_bytes& File_bytes::operator--(int) {
+	pos--;
+	return *this;
+}
+
 File_bytes& File_bytes::operator+=(int x) {
 	pos += x;
 	return *this;
